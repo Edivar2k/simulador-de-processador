@@ -112,6 +112,13 @@ while (!halt) {
         if (reg.PC >= 0xFFFE) break;  // Fim do programa
         reg.IR = prog_mem[reg.PC];
         uint16_t next_pc = reg.PC + 2;
+        
+        if (reg.IR == 0x0000) {
+            printf("\n--- NOP Detectado ---\n");
+            print_state(&reg);
+            reg.PC = next_pc;
+            continue;
+        }
 
         // Decode & Execute
         uint8_t opcode = (reg.IR >> 11) & 0x1F;  // Primeiros 5 bits
@@ -146,7 +153,7 @@ while (!halt) {
 
                     // Verifica o tipo de operação
                     if (op_type == 0x01) {  // PSH Rs (termina com 01)
-                        uint8_t rsPsh = (reg.IR >> 8) & 0x07;  // Extrai o registrador fonte (Rs)
+                        uint8_t rsPsh = (reg.IR >> 2) & 0x02;  // Extrai o registrador fonte (Rs)
                         printf("PSH R%d\n", rsPsh);  // Depuração: Exibe o registrador fonte
                         push(&reg, reg.R[rsPsh]);  // Empilha o valor de Rs
                     }
@@ -154,9 +161,12 @@ while (!halt) {
                         uint8_t rd = (reg.IR >> 8) & 0x07;  // Extrai o registrador destino (Rd)
                         printf("POP R%d\n", rd);  // Depuração: Exibe o registrador destino
                         reg.R[rd] = pop(&reg);  // Desempilha e armazena em Rd
+                    }else { // CMP Rm, Rn
+                        uint8_t rt = (reg.IR >> 2) & 0x07;
+                        printf("CMP R%d, R%d\n", rs, rt);
+                        reg.flags.Z = (rs = rt) ? 1 : 0;
+                        reg.flags.S = (rs < rt) ? 1 : 0;                    
                     }
-                    // Caso op_type seja 0x00, não faz nada e continua a execução
-    
                 }
                 break;
             case 0x09:  // JEQ endereço
@@ -165,6 +175,8 @@ while (!halt) {
                 }
                 break;
             case 0x0A:  // JMP endereço
+                uint8_t op_type = reg.IR & 0x03;
+                uint16_t im = (reg.IR >> 2) & 0x1FF;
                 next_pc = imm;
                 break;
             case 0x0B:  // HALT
